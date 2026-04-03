@@ -305,6 +305,7 @@ async function handleAdminRequest({ context, kv, config, url, requestHost }) {
 
       const enabled = form.get('enabled') ? 1 : 0;
       const cacheEnabled = form.get('cache_enabled') ? 1 : 0;
+      const forceHttps = form.get('force_https') ? 1 : 0;
 
       if (!bindDomain || !targetDomain) {
         return htmlResponse(getAdminHtml(config, await listProxies(kv), editingProxy, editingNode, '请填写绑定域名和源站域名。'));
@@ -323,7 +324,7 @@ async function handleAdminRequest({ context, kv, config, url, requestHost }) {
         id: proxyId || await nextProxyId(kv),
         name, bind_domain: bindDomain, target_domain: targetDomain,
         http_port: httpPort, https_port: httpsPort, proxy_mode: proxyMode,
-        cache_enabled: cacheEnabled, enabled,
+        cache_enabled: cacheEnabled, enabled, force_https: forceHttps,
         create_time: current?.create_time || now, update_time: now,
       };
       await putProxy(kv, proxy, current);
@@ -360,6 +361,15 @@ async function generateSign(target, expire, secret) {
 }
 
 async function proxyRequest(request, proxy, requestHost, config, kv) {
+  const reqUrlObj = new URL(request.url);
+  if (reqUrlObj.protocol === 'http:' && Number(proxy.force_https) === 1) {
+    reqUrlObj.protocol = 'https:';
+    return new Response('', {
+      status: 301,
+      headers: { 'Location': reqUrlObj.toString() }
+    });
+  }
+
   const candidates = [];
   if (proxy.proxy_mode === 'https_only') {
     if (!proxy.https_port) throw new Error('HTTPS端口未配置');
@@ -960,10 +970,10 @@ function getAdminHtml(config, proxyList, editingProxy, editingNode, message) {
       proxyFormsHtml = `
       <div class="content-card" id="edit-proxy-card">
         <div class="card-head-split">
-          <h3 class="card-title"><i class="fa fa-edit"></i>编辑反代配置 (ID: ${escapeHtml(editingProxy.id)})</h3>
+          <h3 class="card-title" style="margin-bottom:0;"><i class="fa fa-edit"></i>编辑反代配置 (ID: ${escapeHtml(editingProxy.id)})</h3>
           <a class="submit-btn submit-btn-lite" href="${config.admin_path}#proxy">取消编辑 / 返回新增</a>
         </div>
-        <form method="POST">
+        <form method="POST" style="margin-top: 1.4rem;">
           <input type="hidden" name="action" value="save_proxy">
           <input type="hidden" name="proxy_id" value="${escapeHtml(editingProxy.id)}">
           <div class="form-grid form-grid-3">
@@ -979,6 +989,7 @@ function getAdminHtml(config, proxyList, editingProxy, editingNode, message) {
           <div class="switch-row" style="margin-bottom:0;">
             <label class="switch-item"><input type="checkbox" name="enabled" ${Number(editingProxy.enabled) === 1 ? 'checked' : ''}><span>启用该反代</span></label>
             <label class="switch-item"><input type="checkbox" name="cache_enabled" ${Number(editingProxy.cache_enabled) === 1 ? 'checked' : ''}><span>开启静态缓存</span></label>
+            <label class="switch-item"><input type="checkbox" name="force_https" ${Number(editingProxy.force_https) === 1 ? 'checked' : ''}><span>强制HTTPS</span></label>
           </div>
           <button type="submit" class="submit-btn"><i class="fa fa-save"></i> 保存修改</button>
         </form>
@@ -990,10 +1001,10 @@ function getAdminHtml(config, proxyList, editingProxy, editingNode, message) {
       </div>
       <div class="content-card" id="add-proxy-card" style="display:none;">
         <div class="card-head-split">
-          <h3 class="card-title"><i class="fa fa-plus-circle"></i>新增反代配置</h3>
+          <h3 class="card-title" style="margin-bottom:0;"><i class="fa fa-plus-circle"></i>新增反代配置</h3>
           <button type="button" class="mini-btn mini-btn-gray" onclick="document.getElementById('add-proxy-card').style.display='none';document.getElementById('add-proxy-btn-wrap').style.display='block';">取消新增</button>
         </div>
-        <form method="POST">
+        <form method="POST" style="margin-top: 1.4rem;">
           <input type="hidden" name="action" value="save_proxy">
           <div class="form-grid form-grid-3">
             <div class="form-group"><label class="form-label">反代名称</label><input type="text" name="name" class="form-input" placeholder="例如：图床站"></div>
@@ -1008,6 +1019,7 @@ function getAdminHtml(config, proxyList, editingProxy, editingNode, message) {
           <div class="switch-row" style="margin-bottom:0;">
             <label class="switch-item"><input type="checkbox" name="enabled" checked><span>默认开启该反代</span></label>
             <label class="switch-item"><input type="checkbox" name="cache_enabled" checked><span>开启静态缓存</span></label>
+            <label class="switch-item"><input type="checkbox" name="force_https"><span>强制HTTPS</span></label>
           </div>
           <button type="submit" class="submit-btn"><i class="fa fa-save"></i> 立即添加</button>
         </form>
@@ -1049,10 +1061,10 @@ function getAdminHtml(config, proxyList, editingProxy, editingNode, message) {
       nodeFormsHtml = `
       <div class="content-card" id="edit-node-card">
         <div class="card-head-split">
-          <h3 class="card-title"><i class="fa fa-edit"></i>编辑下载节点</h3>
+          <h3 class="card-title" style="margin-bottom:0;"><i class="fa fa-edit"></i>编辑下载节点</h3>
           <a class="submit-btn submit-btn-lite" href="${config.admin_path}#node">取消编辑 / 返回新增</a>
         </div>
-        <form method="POST">
+        <form method="POST" style="margin-top: 1.4rem;">
           <input type="hidden" name="action" value="save_download_node">
           <input type="hidden" name="node_id" value="${escapeHtml(editingNode.id)}">
           <div class="form-grid">
@@ -1069,10 +1081,10 @@ function getAdminHtml(config, proxyList, editingProxy, editingNode, message) {
       </div>
       <div class="content-card" id="add-node-card" style="display:none;">
         <div class="card-head-split">
-          <h3 class="card-title"><i class="fa fa-plus-circle"></i>新增下载节点</h3>
+          <h3 class="card-title" style="margin-bottom:0;"><i class="fa fa-plus-circle"></i>新增下载节点</h3>
           <button type="button" class="mini-btn mini-btn-gray" onclick="document.getElementById('add-node-card').style.display='none';document.getElementById('add-node-btn-wrap').style.display='block';">取消新增</button>
         </div>
-        <form method="POST">
+        <form method="POST" style="margin-top: 1.4rem;">
           <input type="hidden" name="action" value="save_download_node">
           <div class="form-grid">
             <div class="form-group"><label class="form-label">备注</label><input type="text" name="node_remark" class="form-input" placeholder="例如：美西节点1" required></div>
@@ -1105,8 +1117,11 @@ function getAdminHtml(config, proxyList, editingProxy, editingNode, message) {
 
       <div id="base-tab" class="tab-content active">
         <div class="content-card">
-          <h3 class="card-title"><i class="fa fa-sliders"></i> 基础访问与安全配置</h3>
-          <form method="POST">
+          <div class="card-head-split" style="margin-bottom: 0;">
+            <h3 class="card-title" style="margin-bottom: 0;"><i class="fa fa-sliders"></i> 基础访问与安全配置</h3>
+            <button type="button" class="mini-btn mini-btn-gray" onclick="const el=document.getElementById('base-form');el.style.display=el.style.display==='none'?'block':'none';">编辑</button>
+          </div>
+          <form id="base-form" method="POST" style="display:none; margin-top: 1.4rem;">
             <input type="hidden" name="action" value="update_base">
             <div class="form-grid">
               <div class="form-group"><label class="form-label">管理员账号</label><input type="text" name="admin_account" class="form-input" value="${escapeHtml(config.admin_account)}" required></div>
@@ -1119,8 +1134,11 @@ function getAdminHtml(config, proxyList, editingProxy, editingNode, message) {
           </form>
         </div>
         <div class="content-card">
-          <h3 class="card-title"><i class="fa fa-globe"></i> 主网站展示配置</h3>
-          <form method="POST">
+          <div class="card-head-split" style="margin-bottom: 0;">
+            <h3 class="card-title" style="margin-bottom: 0;"><i class="fa fa-globe"></i> 主网站展示配置</h3>
+            <button type="button" class="mini-btn mini-btn-gray" onclick="const el=document.getElementById('display-form');el.style.display=el.style.display==='none'?'block':'none';">编辑</button>
+          </div>
+          <form id="display-form" method="POST" style="display:none; margin-top: 1.4rem;">
             <input type="hidden" name="action" value="update_base">
             <input type="hidden" name="main_site_host" value="${escapeHtml(config.main_site_host)}">
             <input type="hidden" name="new_admin_path" value="${escapeHtml(config.admin_path)}">
