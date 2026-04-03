@@ -31,7 +31,7 @@
    请将引号内的默认值，修改为您自己的复杂随机密码。
 
 2. **Cloudflare 下载端代码**：
-   在源码的 `worker.js` 文件顶部第一行，找到相同的一行代码：
+   在源码的 `worker.js` 和functions[[path]]文件顶部第一行，找到相同的一行代码：
    `const SECRET_KEY = 'YOUR_CUSTOM_PASSWORD_HERE';`
    请将其修改成与主控端**完全一模一样**的值。
 
